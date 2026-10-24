@@ -1,0 +1,10 @@
+# One free web service. Rooms live in memory, so keep this at a single instance.
+# An open game sends WebSocket pings, which counts as traffic and delays spin-down.
+services:
+  - type: web
+    name: rpsls-party
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz

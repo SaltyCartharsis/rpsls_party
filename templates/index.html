@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="lan-host" content="{{ lan_host }}">
+  <title>RPSLS Arena Party</title>
+  <style>
+    :root {
+      --bg: #0d1224;
+      --card-bg: rgba(22, 31, 58, 0.82);
+      --teal: #48c5be;
+      --teal-dark: #195b5f;
+      --text: #e2e8f0;
+      --subtext: #8fa0c2;
+      --danger: #f87171;
+      --gold: #facc15;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      height: 100vh;
+      overflow: hidden;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at center, rgba(13, 18, 36, 0.78) 15%, rgba(13, 18, 36, 0.94) 80%),
+        url("/static/background.png");
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: rgba(13, 18, 36, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 2px solid var(--teal-dark);
+    }
+    h1 { font-size: 1.15rem; color: var(--teal); letter-spacing: 1px; font-weight: 800; }
+    #header-right { display: flex; gap: 8px; align-items: center; color: var(--subtext); font-size: 0.92rem; }
+
+    .btn {
+      background: var(--teal);
+      color: #0d1224;
+      border: none;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.55; cursor: default; transform: none; }
+    .btn-secondary { background: #334155; color: var(--text); }
+    .btn-gold { background: var(--gold); color: #0d1224; }
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    .text-btn {
+      background: none;
+      border: none;
+      color: var(--subtext);
+      cursor: pointer;
+      font: inherit;
+      padding: 4px 0;
+    }
+
+    .view { display: none; flex: 1; padding: 20px; flex-direction: column; align-items: center; justify-content: center; }
+    .view.active { display: flex; }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(72, 197, 190, 0.3);
+      padding: 24px;
+      border-radius: 14px;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    label { display: block; font-size: 0.82rem; color: var(--subtext); margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      background: #090d1a;
+      border: 1px solid var(--teal-dark);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+    .code-input { text-transform: uppercase; letter-spacing: 0.14em; font-weight: 800; }
+    .hint { color: var(--subtext); font-size: 0.85rem; line-height: 1.45; margin-bottom: 14px; }
+    .error-line { color: var(--danger); font-size: 0.88rem; min-height: 1.2em; margin-bottom: 8px; }
+
+    .gesture-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      margin: 4px 0 18px;
+    }
+    .gesture-sample { text-align: center; flex: 1; }
+    .gesture-sample figcaption { font-size: 0.68rem; color: var(--subtext); margin-top: 2px; }
+    .gesture-sample .icon-svg { width: 58px; height: 58px; }
+
+    .host-layout {
+      display: flex;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      gap: 16px;
+      padding: 16px;
+    }
+    #host-view.active { padding: 0; min-height: 0; }
+    .arena-stage {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+      min-height: 280px;
+      background: rgba(13, 18, 36, 0.7);
+      border: 1px solid var(--teal-dark);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    #arena-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #arena-nodes { position: absolute; inset: 0; pointer-events: none; }
+    .arena-round {
+      position: absolute;
+      top: 12px;
+      left: 14px;
+      z-index: 2;
+      color: var(--teal);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      font-size: 0.85rem;
+    }
+    .player-node {
+      position: absolute;
+      width: 84px;
+      height: 84px;
+      transform: translate(-50%, -50%);
+    }
+    .node-badge .icon-svg { width: 84px; height: 84px; }
+    .node-label {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      width: max-content;
+      max-width: 130px;
+      pointer-events: none;
+    }
+    .node-name, .node-meta {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 800;
+      text-shadow: 0 1px 3px #000, 0 0 4px #000;
+    }
+    .node-name { font-size: 0.85rem; }
+    .node-meta { color: var(--gold); font-size: 0.75rem; }
+
+    .sidebar {
+      width: 320px;
+      background: var(--card-bg);
+      border: 1px solid var(--teal-dark);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+    .room-code {
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 2rem;
+      letter-spacing: 0.18em;
+      color: var(--gold);
+      font-weight: 800;
+    }
+    .join-url {
+      font-size: 0.78rem;
+      color: var(--subtext);
+      word-break: break-word;
+      margin: 4px 0 8px;
+    }
+    #host-note {
+      color: var(--gold);
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+    #host-roster { font-size: 0.95rem; overflow-y: auto; max-height: 24vh; }
+    .roster-row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .roster-score { color: var(--gold); font-weight: 800; }
+    .feed-wrap { flex: 1; display: flex; flex-direction: column; min-height: 80px; }
+    #host-log {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      padding: 10px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+    .log-empty { color: var(--subtext); }
+    .log-line { margin-bottom: 6px; }
+    .controls { display: flex; flex-direction: column; gap: 8px; }
+    .control-row { display: flex; gap: 8px; }
+    .control-row .btn, .controls > .btn { flex: 1; }
+
+    .controller-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+      max-width: 420px;
+      margin-top: 12px;
+    }
+    .controller-grid .choice-btn:nth-child(5) { grid-column: span 2; }
+    .choice-btn {
+      background: rgba(22, 31, 58, 0.9);
+      border: 2px solid var(--teal-dark);
+      border-radius: 12px;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .choice-btn .icon-svg { width: 84px; height: 84px; }
+    .choice-btn:disabled { cursor: default; }
+    @media (hover: hover) {
+      .choice-btn:not(:disabled):hover { border-color: var(--teal); transform: translateY(-2px); }
+    }
+    .choice-btn.selected {
+      border-color: var(--gold);
+      box-shadow: 0 0 15px rgba(250, 204, 21, 0.4);
+      background: rgba(40, 56, 95, 0.95);
+    }
+    .choice-btn.selected .badge-ring { stroke: var(--gold); stroke-width: 4; }
+    #phone-status { font-weight: 700; color: var(--gold); margin-bottom: 8px; text-align: center; }
+
+    .icon-svg { overflow: visible; display: block; margin: 0 auto; }
+
+    .hand-rock {
+      transform-box: view-box;
+      transform-origin: 44px 48px;
+      animation: rock-pound 0.72s ease-in-out infinite;
+    }
+    @keyframes rock-pound {
+      0%, 100% { transform: translateY(-3px) rotate(-8deg); }
+      38% { transform: translateY(-6px) rotate(-12deg); }
+      58% { transform: translateY(4px) rotate(6deg); }
+      74% { transform: translateY(1px) rotate(1deg); }
+    }
+    .hand-paper .finger {
+      transform-box: fill-box;
+      transform-origin: center bottom;
+      animation: finger-wave 1.25s ease-in-out infinite;
+    }
+    .hand-paper .f2 { animation-delay: 0.1s; }
+    .hand-paper .f3 { animation-delay: 0.2s; }
+    .hand-paper .f4 { animation-delay: 0.3s; }
+    @keyframes finger-wave {
+      0%, 100% { transform: rotate(-2deg); }
+      50% { transform: rotate(8deg); }
+    }
+    .hand-scissors .blade {
+      transform-box: view-box;
+      transform-origin: 40px 46px;
+    }
+    .hand-scissors .top { animation: snip-top 0.38s ease-in-out infinite alternate; }
+    .hand-scissors .bot { animation: snip-bot 0.38s ease-in-out infinite alternate; }
+    @keyframes snip-top { from { transform: rotate(-28deg); } to { transform: rotate(-4deg); } }
+    @keyframes snip-bot { from { transform: rotate(28deg); } to { transform: rotate(4deg); } }
+    .hand-lizard .jaw-upper, .hand-lizard .jaw-lower { transform-box: view-box; }
+    .hand-lizard .jaw-upper {
+      transform-origin: 32px 40px;
+      animation: jaw-up 0.48s ease-in-out infinite alternate;
+    }
+    .hand-lizard .jaw-lower {
+      transform-origin: 32px 48px;
+      animation: jaw-down 0.48s ease-in-out infinite alternate;
+    }
+    @keyframes jaw-up { from { transform: rotate(-14deg); } to { transform: rotate(2deg); } }
+    @keyframes jaw-down { from { transform: rotate(16deg); } to { transform: rotate(-1deg); } }
+    .hand-spock .pair {
+      transform-box: fill-box;
+      transform-origin: center bottom;
+      animation-duration: 1.05s;
+      animation-timing-function: ease-in-out;
+      animation-iteration-count: infinite;
+      animation-direction: alternate;
+    }
+    .hand-spock .left { animation-name: spock-left; }
+    .hand-spock .right { animation-name: spock-right; }
+    @keyframes spock-left { from { transform: rotate(1deg); } to { transform: rotate(-9deg); } }
+    @keyframes spock-right { from { transform: rotate(-1deg); } to { transform: rotate(9deg); } }
+    .spark {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: spark 0.85s ease-in-out infinite alternate;
+    }
+    @keyframes spark {
+      from { opacity: 0.2; transform: scale(0.45); }
+      to { opacity: 1; transform: scale(1.55); }
+    }
+    .wait-dot { transform-box: fill-box; transform-origin: center; animation: dotpulse 1s ease-in-out infinite; }
+    .wait-dot.d2 { animation-delay: 0.15s; }
+    .wait-dot.d3 { animation-delay: 0.3s; }
+    @keyframes dotpulse {
+      from { opacity: 0.35; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1.15); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hand-rock, .hand-paper .finger, .hand-scissors .blade,
+      .hand-lizard .jaw-upper, .hand-lizard .jaw-lower,
+      .hand-spock .pair, .spark, .wait-dot { animation: none; }
+    }
+
+    @media (max-width: 860px) {
+      body { height: auto; overflow: auto; }
+      .host-layout { flex-direction: column; }
+      .arena-stage { height: 68vh; flex: none; }
+      .sidebar { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title-text">RPSLS // ARENA</h1>
+    <div id="header-right"></div>
+  </header>
+
+  <div id="entry-view" class="view active">
+    <div class="card">
+      <h2 style="color:var(--teal); margin-bottom: 6px;">Choose Display Mode</h2>
+      <p class="hint">Open <strong>Host</strong> on the TV or laptop. Everyone else joins from a phone.</p>
+      <div class="gesture-row" id="gesture-row"></div>
+      <label for="setup-room">Room code</label>
+      <input class="code-input" type="text" id="setup-room" maxlength="6" autocomplete="off" spellcheck="false">
+      <p class="hint">Phones join this same site and enter the code. You can change it before hosting.</p>
+      <button class="btn" id="host-btn" type="button" style="width:100%; margin-bottom:12px;">Host on this Screen</button>
+      <button class="btn btn-secondary" id="player-entry-btn" type="button" style="width:100%;">Join with Phone Controller</button>
+    </div>
+  </div>
+
+  <div id="join-view" class="view">
+    <div class="card">
+      <button class="text-btn" id="join-back" type="button">Back</button>
+      <h2 style="color:var(--teal); margin: 8px 0 12px;">Join Match</h2>
+      <label for="join-room">Room code</label>
+      <input class="code-input" type="text" id="join-room" maxlength="6" autocomplete="off" spellcheck="false" placeholder="CODE ON THE TV">
+      <label for="join-name">Your name</label>
+      <input type="text" id="join-name" maxlength="12" placeholder="Your name">
+      <div class="error-line" id="join-error"></div>
+      <button class="btn" id="join-btn" type="button" style="width:100%;">Enter Arena</button>
+    </div>
+  </div>
+
+  <div id="controller-view" class="view">
+    <div id="phone-status">Waiting for the round to start…</div>
+    <div class="controller-grid" id="choice-grid"></div>
+    <button class="text-btn" id="leave-btn" type="button" style="margin-top:18px;">Leave match</button>
+  </div>
+
+  <div id="host-view" class="view">
+    <div class="host-layout">
+      <div class="arena-stage" id="arena-stage">
+        <canvas id="arena-canvas"></canvas>
+        <div id="arena-nodes"></div>
+        <div class="arena-round" id="arena-round">LOBBY</div>
+      </div>
+      <aside class="sidebar">
+        <div>
+          <div style="color:var(--subtext); font-size:0.78rem; letter-spacing:0.08em;">ROOM CODE</div>
+          <div class="room-code" id="host-room-code">----</div>
+          <div class="join-url" id="host-join-url"></div>
+          <button class="btn btn-secondary" id="copy-link-btn" type="button">Copy join link</button>
+        </div>
+        <div id="host-note" hidden></div>
+        <div>
+          <h3 style="color:var(--teal); margin-bottom:6px;">Leaderboard</h3>
+          <div id="host-roster"></div>
+        </div>
+        <div class="feed-wrap">
+          <h3 style="color:var(--danger); margin-bottom:6px;">Clash Feed</h3>
+          <div id="host-log"><div class="log-empty">Wins land here after each round.</div></div>
+        </div>
+        <div class="controls">
+          <button class="btn btn-gold" id="host-action-btn" type="button">Start Round</button>
+          <div class="control-row">
+            <button class="btn btn-secondary" id="add-bot-btn" type="button">Add CPU</button>
+            <button class="btn btn-danger" id="reset-btn" type="button">Reset Game</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const CHOICES = ["Rock", "Paper", "Scissors", "Lizard", "Spock"];
+    const HANDS = {
+      Rock: '<g class="hand-rock"><circle cx="42" cy="46" r="14" fill="#fff"/><circle cx="33" cy="38" r="8" fill="#fff"/><circle cx="43" cy="34" r="8.5" fill="#fff"/><circle cx="53" cy="38" r="8" fill="#fff"/><path fill="#fff" d="M20 44c-5 3-6 11-1 15 6 4 16 3 22-1 2-1 2-4 0-5-7-3-14-4-18-6-2-1-3-2-3-3z"/><path d="M32 50h16" stroke="#13485c" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.35"/></g>',
+      Paper: '<g class="hand-paper"><g class="finger f1"><rect x="27" y="18" width="6.5" height="24" rx="3.2" fill="#fff"/></g><g class="finger f2"><rect x="34.5" y="12" width="6.5" height="30" rx="3.2" fill="#fff"/></g><g class="finger f3"><rect x="42" y="14" width="6.5" height="28" rx="3.2" fill="#fff"/></g><g class="finger f4"><rect x="49.5" y="18" width="6" height="23" rx="3" fill="#fff"/></g><path fill="#fff" d="M25 38h33c1.4 0 2.6 1.4 2.6 3.2V54c0 8-6.4 14-15 14h-7c-8 0-14-6-14-14V41c0-1.8 1-3 0.4-3z"/><path fill="#fff" d="M24 43c-6 1.2-10 6.5-8.5 12 1.2 4 5.6 5.6 9.4 4 1.6-.7 2.8-2.4 3.6-4.2v-8c-.6-2-1.8-3.6-4.5-3.8z"/></g>',
+      Scissors: '<g class="hand-scissors"><g class="blade top"><rect x="36.5" y="13" width="7" height="32" rx="3.5" fill="#fff"/></g><g class="blade bot"><rect x="36.5" y="13" width="7" height="32" rx="3.5" fill="#fff"/></g><path fill="#fff" d="M26 46h28c2 0 3.5 1.8 3.5 4v8c0 6.5-5.5 11.5-13.5 11.5h-8c-8 0-13.5-5-13.5-11.5v-8c0-2.2 1.5-4 3.5-4z"/><path fill="#fff" d="M25 50c-6 1-9 6.5-7 11 1.8 3.4 6 4.2 9 2.2l2.5-1.8v-8.2c-.8-1.8-2-3-4.5-3.2z"/></g>',
+      Lizard: '<g class="hand-lizard"><path fill="#fff" d="M12 42c.4-7 6-10 11-7l5 2.5v14L23 54c-6 2.4-12-.4-11-7z"/><g class="jaw-upper"><path fill="#fff" d="M27 37c9-9 24-13 38-8 3.2 1.2 4.6 4.2 2.4 6.6-9 3.6-22 5.2-34 3.2-3.4-.6-6.2-1.4-6.4-1.8z"/><circle cx="60" cy="32" r="2.1" fill="#16384a"/><circle cx="52" cy="34.5" r="1.2" fill="#16384a"/></g><g class="jaw-lower"><path fill="#fff" d="M28 45c11 .4 25 1.2 35-4.2 2.6-1.4 4.8 1.8 3.2 4.6-7.2 6.4-20 9-33 6.6-4.6-.8-6.6-3.4-5.2-7z"/></g></g>',
+      Spock: '<g class="hand-spock"><g class="pair left"><rect x="18" y="16" width="6" height="27" rx="3" fill="#fff"/><rect x="26" y="12" width="6" height="31" rx="3" fill="#fff"/></g><g class="pair right"><rect x="48" y="12" width="6" height="31" rx="3" fill="#fff"/><rect x="56" y="16" width="6" height="26" rx="3" fill="#fff"/></g><path fill="#fff" d="M18 41h46c1 0 2 1.6 2 3.4V57c0 8-7 13-16 13H32c-9 0-16-5-16-13V44.4c0-1.8 1-3.4 2-3.4z"/><path fill="#fff" d="M18 46c-7 1.5-10 8-7 13 2 3.6 7 4.4 10 2.4l2.4-2V50c-.6-2.4-2.2-3.8-5.4-4z"/><circle class="spark" cx="40" cy="22" r="2.4" fill="#b8fff8"/></g>'
+    };
+
+    let socket = null;
+    let socketRole = null;
+    let shouldReconnect = false;
+    let reconnectTimer = null;
+    let myPid = null;
+    let myName = "";
+    let roomCode = "";
+    let roomState = null;
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    function cleanCode(value) {
+      return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    }
+
+    function makeCode() {
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 4; i += 1) {
+        code += alphabet[Math.floor(Math.random() * alphabet.length)];
+      }
+      return code;
+    }
+
+    let iconSerial = 0;
+    function iconWrap(inner) {
+      iconSerial += 1;
+      const patternId = `hand-stripes-${iconSerial}`;
+      return `<svg class="icon-svg" viewBox="0 0 80 80" aria-hidden="true"><defs><pattern id="${patternId}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(28)"><rect width="5" height="5" fill="#123848"></rect><rect width="2.2" height="5" fill="#1a6d82"></rect></pattern></defs><circle class="badge-ring" cx="40" cy="40" r="34" fill="url(#${patternId})" stroke="#5ee0d8" stroke-width="3"></circle>${inner}</svg>`;
+    }
+
+    function hiddenIcon(ready) {
+      const mark = ready
+        ? '<path d="M30 42 l7 7 14-16" fill="none" stroke="#7ef3ea" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'
+        : '<circle class="wait-dot d1" cx="30" cy="40" r="3" fill="#7ef3ea"/><circle class="wait-dot d2" cx="40" cy="40" r="3" fill="#7ef3ea"/><circle class="wait-dot d3" cx="50" cy="40" r="3" fill="#7ef3ea"/>';
+      return iconWrap(mark);
+    }
+
+    function setView(id) {
+      document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+    }
+
+    function joinBase() {
+      const lan = document.querySelector('meta[name="lan-host"]').content;
+      const host = location.hostname;
+      if ((host === "localhost" || host === "127.0.0.1") && lan) {
+        const port = location.port ? `:${location.port}` : "";
+        return `${location.protocol}//${lan}${port}`;
+      }
+      return location.origin;
+    }
+
+    function joinLink() {
+      return `${joinBase()}/?room=${encodeURIComponent(roomCode)}`;
+    }
+
+    function pointsLabel(score) {
+      return `${score} ${score === 1 ? "pt" : "pts"}`;
+    }
+
+    function setHostNote(text) {
+      const note = document.getElementById("host-note");
+      note.textContent = text || "";
+      note.hidden = !text;
+    }
+
+    function renderLog(htmlLines) {
+      const log = document.getElementById("host-log");
+      if (!htmlLines.length) {
+        log.innerHTML = '<div class="log-empty">Wins land here after each round.</div>';
+        return;
+      }
+      log.innerHTML = htmlLines.map((line) => `<div class="log-line">${line}</div>`).join("");
+      log.scrollTop = 0;
+    }
+
+    function renderPlainLog(text) {
+      renderLog(text ? [escapeHtml(text)] : []);
+    }
+
+    function closeSocket() {
+      shouldReconnect = false;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+        socket = null;
+      }
+      socketRole = null;
+    }
+
+    function connect(role) {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+      }
+      shouldReconnect = true;
+      socketRole = role;
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const current = new WebSocket(`${proto}//${location.host}/ws/${encodeURIComponent(roomCode)}/${role}`);
+      socket = current;
+      current.onopen = () => {
+        if (role === "host") setHostNote("");
+        if (role === "player") {
+          current.send(JSON.stringify({ action: "JOIN", name: myName }));
+        }
+      };
+      current.onmessage = (event) => {
+        if (socket !== current) return;
+        let msg;
+        try { msg = JSON.parse(event.data); } catch (err) { return; }
+        handleMessage(msg, role);
+      };
+      current.onclose = () => {
+        if (socket !== current) return;
+        socket = null;
+        if (!shouldReconnect) return;
+        if (role === "host") {
+          setHostNote("Connection lost. Reconnecting…");
+          reconnectTimer = setTimeout(() => connect("host"), 1200);
+        } else {
+          document.getElementById("phone-status").textContent = "Connection lost. Leave and join again.";
+        }
+      };
+    }
+
+    function handleMessage(msg, role) {
+      if (msg.type === "INFO") {
+        if (role === "host") setHostNote(msg.message);
+        else if (!myPid) document.getElementById("join-error").textContent = msg.message;
+        return;
+      }
+      if (msg.type === "JOIN_SUCCESS") {
+        myPid = msg.pid;
+        if (msg.room) roomCode = msg.room;
+        setView("controller-view");
+        return;
+      }
+      if (msg.type !== "STATE_UPDATE") return;
+      roomState = msg;
+      if (msg.room) roomCode = msg.room;
+      if (role === "host") renderHost();
+      else updatePhone(msg);
+    }
+
+    function initHost() {
+      roomCode = cleanCode(document.getElementById("setup-room").value) || makeCode();
+      document.getElementById("setup-room").value = roomCode;
+      myPid = null;
+      roomState = null;
+      setView("host-view");
+      setHostNote("");
+      renderPlainLog("");
+      connect("host");
+    }
+
+    function sendAction(action) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      socket.send(JSON.stringify({ action }));
+    }
+
+    function hostAdvance() {
+      if (!roomState) return;
+      if (roomState.state === "LOBBY") sendAction("START_ROUND");
+      else if (roomState.state === "RESOLVED") sendAction("NEXT_ROUND");
+    }
+
+    function resetGame() {
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      const sure = window.confirm("Reset the game? Scores go back to zero and everyone returns to the lobby.");
+      if (!sure) return;
+      sendAction("RESET_GAME");
+    }
+
+    function renderHost() {
+      const state = roomState;
+      document.getElementById("host-room-code").textContent = state.room || roomCode;
+      document.getElementById("header-right").textContent = state.state === "LOBBY" ? "Lobby" : `Round ${state.round}`;
+      const local = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+      document.getElementById("host-join-url").textContent = local
+        ? `Same Wi-Fi: ${joinBase()}`
+        : joinBase();
+
+      const action = document.getElementById("host-action-btn");
+      if (state.state === "LOBBY") {
+        action.textContent = "Start Round";
+        action.disabled = false;
+      } else if (state.state === "CHOOSING") {
+        action.textContent = "Waiting for picks…";
+        action.disabled = true;
+      } else {
+        action.textContent = "Next Round";
+        action.disabled = false;
+      }
+
+      const roster = document.getElementById("host-roster");
+      if (!state.players.length) {
+        roster.innerHTML = '<div class="log-empty">Nobody here yet. Add a CPU or share the code.</div>';
+      } else {
+        const sorted = [...state.players].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+        roster.innerHTML = sorted.map((player) => {
+          const mark = state.state === "CHOOSING" ? (player.has_chosen ? " ✓" : " …") : "";
+          const cpu = player.is_cpu ? " (CPU)" : "";
+          return `<div class="roster-row"><span>${escapeHtml(player.name)}${cpu}</span><span class="roster-score">${pointsLabel(player.score)}${mark}</span></div>`;
+        }).join("");
+      }
+
+      if (state.state === "RESOLVED") {
+        const victories = state.victories || [];
+        if (!victories.length) renderPlainLog("Everyone tied. Nobody scores.");
+        else {
+          renderLog(victories.map((victory) =>
+            `<strong>${escapeHtml(victory.winner_name)}</strong>'s ${escapeHtml(victory.winner_choice)} <em>${escapeHtml(victory.verb)}</em> <strong>${escapeHtml(victory.loser_name)}</strong>'s ${escapeHtml(victory.loser_choice)}`
+          ));
+        }
+      } else if (state.state === "CHOOSING") {
+        setHostNote("");
+        renderPlainLog(`Round ${state.round} is open. Waiting for picks.`);
+      } else {
+        renderPlainLog("");
+      }
+
+      document.getElementById("arena-round").textContent = state.state === "LOBBY" ? "LOBBY" : `ROUND ${state.round}`;
+      renderCanvas();
+    }
+
+    function renderCanvas() {
+      const stage = document.getElementById("arena-stage");
+      const canvas = document.getElementById("arena-canvas");
+      const nodes = document.getElementById("arena-nodes");
+      const width = stage.clientWidth;
+      const height = stage.clientHeight;
+      if (width < 2 || height < 2) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      if (!roomState || !roomState.players.length) {
+        nodes.innerHTML = "";
+        return;
+      }
+
+      const cx = width / 2;
+      const cy = height / 2;
+      const radius = Math.max(64, Math.min(cx, cy) - 128);
+      const count = roomState.players.length;
+      const coords = {};
+      roomState.players.forEach((player, index) => {
+        const angle = (2 * Math.PI * index / count) - (Math.PI / 2);
+        coords[player.id] = {
+          x: cx + radius * Math.cos(angle),
+          y: cy + radius * Math.sin(angle),
+          angle
+        };
+      });
+
+      (roomState.victories || []).forEach((victory) => {
+        const from = coords[victory.winner];
+        const to = coords[victory.loser];
+        if (!from || !to) return;
+        const ctrlX = ((from.x + to.x) / 2) * 0.7 + cx * 0.3;
+        const ctrlY = ((from.y + to.y) / 2) * 0.7 + cy * 0.3;
+        const angle = Math.atan2(to.y - ctrlY, to.x - ctrlX);
+        const endX = to.x - Math.cos(angle) * 46;
+        const endY = to.y - Math.sin(angle) * 46;
+
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+        ctx.strokeStyle = "#f87171";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.fillStyle = "#f87171";
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - 14 * Math.cos(angle - Math.PI / 6), endY - 14 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(endX - 14 * Math.cos(angle + Math.PI / 6), endY - 14 * Math.sin(angle + Math.PI / 6));
+        ctx.fill();
+
+        ctx.fillStyle = "#0d1224";
+        ctx.fillRect(ctrlX - 30, ctrlY - 9, 60, 18);
+        ctx.strokeStyle = "#48c5be";
+        ctx.strokeRect(ctrlX - 30, ctrlY - 9, 60, 18);
+        ctx.fillStyle = "#facc15";
+        ctx.font = "italic 11px Segoe UI";
+        ctx.textAlign = "center";
+        ctx.fillText(victory.verb, ctrlX, ctrlY + 4);
+      });
+
+      nodes.innerHTML = roomState.players.map((player) => {
+        const point = coords[player.id];
+        let icon = hiddenIcon(false);
+        let caption = pointsLabel(player.score);
+        if (roomState.state === "RESOLVED" && player.choice) {
+          icon = iconWrap(HANDS[player.choice]);
+          caption = `${player.choice} · ${pointsLabel(player.score)}`;
+        } else if (roomState.state === "CHOOSING") {
+          icon = hiddenIcon(player.has_chosen);
+          caption = player.has_chosen ? `Ready · ${pointsLabel(player.score)}` : `Picking · ${pointsLabel(player.score)}`;
+        }
+        const labelX = Math.cos(point.angle) * 62;
+        const labelY = Math.sin(point.angle) * 62;
+        return `<div class="player-node" style="left:${point.x}px;top:${point.y}px"><div class="node-badge">${icon}</div><div class="node-label" style="left:calc(50% + ${labelX}px);top:calc(50% + ${labelY}px)"><div class="node-name">${escapeHtml(player.name)}</div><div class="node-meta">${escapeHtml(caption)}</div></div></div>`;
+      }).join("");
+    }
+
+    function showJoin() {
+      document.getElementById("join-error").textContent = "";
+      setView("join-view");
+    }
+
+    function connectPlayer() {
+      const code = cleanCode(document.getElementById("join-room").value);
+      const name = document.getElementById("join-name").value.trim().slice(0, 12);
+      const error = document.getElementById("join-error");
+      if (!code) {
+        error.textContent = "Enter the room code from the host screen.";
+        return;
+      }
+      if (!name) {
+        error.textContent = "Enter a name.";
+        return;
+      }
+      error.textContent = "";
+      roomCode = code;
+      myName = name;
+      myPid = null;
+      document.getElementById("join-room").value = code;
+      connect("player");
+    }
+
+    function updatePhone(state) {
+      const status = document.getElementById("phone-status");
+      const choosing = state.state === "CHOOSING";
+      document.querySelectorAll(".choice-btn").forEach((button) => {
+        button.disabled = !choosing;
+        button.classList.toggle("selected", choosing && button.dataset.choice === state.my_choice);
+      });
+      if (state.state === "LOBBY") status.textContent = "Connected. Waiting for the host to start.";
+      else if (choosing) {
+        status.textContent = state.my_choice
+          ? `Locked in: ${state.my_choice}. You can still change it.`
+          : `Round ${state.round}. Pick your move.`;
+      } else status.textContent = "Round over. Watch the arena screen.";
+    }
+
+    function submitChoice(choice) {
+      if (!roomState || roomState.state !== "CHOOSING" || !socket || socket.readyState !== WebSocket.OPEN) return;
+      socket.send(JSON.stringify({ action: "SUBMIT_CHOICE", choice }));
+    }
+
+    function leaveMatch() {
+      closeSocket();
+      myPid = null;
+      roomState = null;
+      setView("entry-view");
+    }
+
+    function renderStaticIcons() {
+      document.getElementById("gesture-row").innerHTML = CHOICES.map((name) =>
+        `<figure class="gesture-sample"><div>${iconWrap(HANDS[name])}</div><figcaption>${name}</figcaption></figure>`
+      ).join("");
+      document.getElementById("choice-grid").innerHTML = CHOICES.map((name) =>
+        `<button class="choice-btn" type="button" data-choice="${name}" disabled>${iconWrap(HANDS[name])}<span>${name}</span></button>`
+      ).join("");
+    }
+
+    function boot() {
+      renderStaticIcons();
+      const params = new URLSearchParams(location.search);
+      const preset = cleanCode(params.get("room"));
+      const generated = preset || makeCode();
+      document.getElementById("setup-room").value = generated;
+      if (preset) {
+        document.getElementById("join-room").value = preset;
+        setView("join-view");
+      }
+
+      document.getElementById("host-btn").addEventListener("click", initHost);
+      document.getElementById("player-entry-btn").addEventListener("click", showJoin);
+      document.getElementById("join-back").addEventListener("click", () => setView("entry-view"));
+      document.getElementById("join-btn").addEventListener("click", connectPlayer);
+      document.getElementById("join-name").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") connectPlayer();
+      });
+      document.getElementById("choice-grid").addEventListener("click", (event) => {
+        const button = event.target.closest(".choice-btn");
+        if (!button || button.disabled) return;
+        submitChoice(button.dataset.choice);
+      });
+      document.getElementById("leave-btn").addEventListener("click", leaveMatch);
+      document.getElementById("host-action-btn").addEventListener("click", hostAdvance);
+      document.getElementById("add-bot-btn").addEventListener("click", () => sendAction("ADD_BOT"));
+      document.getElementById("reset-btn").addEventListener("click", resetGame);
+      document.getElementById("copy-link-btn").addEventListener("click", async () => {
+        const button = document.getElementById("copy-link-btn");
+        try {
+          await navigator.clipboard.writeText(joinLink());
+          button.textContent = "Copied";
+        } catch (err) {
+          button.textContent = "Copy failed";
+        }
+        setTimeout(() => { button.textContent = "Copy join link"; }, 1400);
+      });
+
+      const stage = document.getElementById("arena-stage");
+      const observer = new ResizeObserver(() => {
+        if (document.getElementById("host-view").classList.contains("active")) renderCanvas();
+      });
+      observer.observe(stage);
+      setInterval(() => {
+        if (document.visibilityState !== "visible") return;
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ action: "PING" }));
+        }
+      }, 25000);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
